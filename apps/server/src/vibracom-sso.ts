@@ -1,6 +1,6 @@
 import { createHmac, randomUUID } from "node:crypto";
 import type { Config } from "@agenteschat/config";
-import { type Database, eq, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, eq, isNull, schema, sql } from "@agenteschat/db";
 import { accountClosed, joinOrganization, safeEqual } from "@agenteschat/engine";
 import type { BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthEndpoint } from "better-auth/api";
@@ -68,6 +68,43 @@ export function verifyVibracomToken(
   return claims;
 }
 
+const StatusClaims = z.object({
+  iss: z.literal(ISSUER),
+  aud: z.string(),
+  purpose: z.literal("status"),
+  iat: z.number().int(),
+  exp: z.number().int(),
+});
+
+/** A status-check token from vibracom-sistema (no person in it): signature, audience and a short life. */
+export function verifyVibracomStatusToken(
+  token: string,
+  secret: string,
+  audience: string,
+  nowSeconds = Math.floor(Date.now() / 1000),
+): boolean {
+  const parts = token.split(".");
+  if (parts.length !== 3 || token.length > 2048) return false;
+  const [head, body, signature] = parts as [string, string, string];
+  try {
+    const header = JSON.parse(Buffer.from(head, "base64url").toString("utf8"));
+    if (header?.alg !== "HS256") return false;
+    const expected = createHmac("sha256", secret).update(`${head}.${body}`).digest("base64url");
+    if (!safeEqual(expected, signature)) return false;
+    const parsed = StatusClaims.safeParse(JSON.parse(Buffer.from(body, "base64url").toString("utf8")));
+    if (!parsed.success) return false;
+    const c = parsed.data;
+    return (
+      c.aud === audience &&
+      c.exp >= nowSeconds - CLOCK_SLACK_SECONDS &&
+      c.iat <= nowSeconds + CLOCK_SLACK_SECONDS &&
+      c.exp - c.iat <= MAX_LIFE_SECONDS
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** The workspace people join: the configured one, or the only one there is. */
 async function vibracomOrgId(db: Database, config: Config): Promise<string | null> {
   if (config.VIBRACOM_SSO_ORG_ID) return config.VIBRACOM_SSO_ORG_ID;
@@ -87,7 +124,7 @@ export function vibracomSso(deps: { db: Database; config: Config; log: Logger })
     endpoints: {
       vibracomSso: createAuthEndpoint(
         "/vibracom-sso",
-        { method: "GET", query: z.object({ t: z.string().min(20).max(4096), next: z.string().max(300).optional() }) },
+        { method: "GET", query: z.object({ t: z.string().min(20).max(4096), next: z.string().max(2000).optional() }) },
         async (ctx) => {
           const secret = config.VIBRACOM_SSO_SECRET;
           if (!secret) throw new APIError("NOT_FOUND", { message: "Not found" });
@@ -149,6 +186,34 @@ export function vibracomSso(deps: { db: Database; config: Config; log: Logger })
           throw ctx.redirect(`${publicOrigin}${next}`);
         },
       ),
+      // What vibracom-sistema shows before opening the frame: whether a model key is set (else a clear "not ready"
+      // with what the admin has to do) and the workspace's agents, for its shortcuts. Nothing secret: no key, no person.
+      vibracomStatus: createAuthEndpoint("/vibracom-status", { method: "GET" }, async (ctx) => {
+        const secret = config.VIBRACOM_SSO_SECRET;
+        if (!secret) throw new APIError("NOT_FOUND", { message: "Not found" });
+        const auth = ctx.headers?.get("authorization") ?? "";
+        const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+        if (!verifyVibracomStatusToken(token, secret, publicOrigin))
+          throw new APIError("UNAUTHORIZED", { message: "Unauthorized" });
+        const orgId = await vibracomOrgId(db, config);
+        if (!orgId) return ctx.json({ orgId: null, ready: false, providers: [], agents: [] });
+        const credentials = await db
+          .select({ provider: schema.providerCredentials.provider })
+          .from(schema.providerCredentials)
+          .where(and(eq(schema.providerCredentials.orgId, orgId), isNull(schema.providerCredentials.revokedAt)));
+        const agents = await db
+          .select({
+            id: schema.agents.id,
+            name: schema.agents.name,
+            handle: schema.agents.handle,
+            role: schema.agents.role,
+          })
+          .from(schema.agents)
+          .where(and(eq(schema.agents.orgId, orgId), isNull(schema.agents.archivedAt)))
+          .orderBy(asc(schema.agents.createdAt));
+        const providers = [...new Set(credentials.map((c) => c.provider))];
+        return ctx.json({ orgId, ready: providers.length > 0, providers, agents });
+      }),
     },
   } satisfies BetterAuthPlugin;
 }

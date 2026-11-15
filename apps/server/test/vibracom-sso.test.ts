@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { signJwtHs256 } from "@agenteschat/engine";
 import { appCsp } from "../src/app";
-import { verifyVibracomToken } from "../src/vibracom-sso";
+import { verifyVibracomStatusToken, verifyVibracomToken } from "../src/vibracom-sso";
 
 const SECRET = "s".repeat(48);
 const AUD = "https://agentes.example.com";
@@ -45,5 +45,28 @@ describe("frame ancestors", () => {
   test("upstream policy when unset, the listed origins when set", () => {
     expect(appCsp(undefined)).toContain("frame-ancestors 'none'");
     expect(appCsp("https://sistema.example.com")).toContain("frame-ancestors 'self' https://sistema.example.com;");
+  });
+});
+
+describe("vibracom status token", () => {
+  const status = (over: Record<string, unknown> = {}) => ({
+    iss: "vibracom-sistema",
+    aud: AUD,
+    purpose: "status",
+    iat: now,
+    exp: now + 60,
+    ...over,
+  });
+  test("accepts a fresh status token", () => {
+    expect(verifyVibracomStatusToken(signJwtHs256(status(), SECRET), SECRET, AUD, now)).toBe(true);
+  });
+  test("refuses a sign-in token, another secret, audience or a long life", () => {
+    expect(verifyVibracomStatusToken(signJwtHs256(claims(), SECRET), SECRET, AUD, now)).toBe(false);
+    expect(verifyVibracomStatusToken(signJwtHs256(status(), "x".repeat(48)), SECRET, AUD, now)).toBe(false);
+    expect(
+      verifyVibracomStatusToken(signJwtHs256(status({ aud: "https://x.example" }), SECRET), SECRET, AUD, now),
+    ).toBe(false);
+    expect(verifyVibracomStatusToken(signJwtHs256(status({ exp: now + 3600 }), SECRET), SECRET, AUD, now)).toBe(false);
+    expect(verifyVibracomStatusToken("a.b.c", SECRET, AUD, now)).toBe(false);
   });
 });
