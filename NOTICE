@@ -1,5 +1,9 @@
 agentes.chat — Copyright (C) 2026 Codari Global, LLC and contributors
 
+vibracom-agentes: based on agentes.chat by Codari Global, LLC. Modified by
+Listralize (2026) for vibracom; changes listed in VIBRACOM.md. Source of this
+modified version: https://github.com/listralize/vibracom-agentes
+
 Unless a file or package says otherwise, this repository is licensed under the
 GNU Affero General Public License version 3 only (SPDX: AGPL-3.0-only), in
 LICENSE. Packages with their own LICENSE file and package.json "license"

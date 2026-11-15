@@ -1,3 +1,5 @@
+> **vibracom-agentes** — Based on agentes.chat by Codari Global, LLC. Fork da Listralize para a vibracom (AGPL-3.0-only); mudanças descritas em [VIBRACOM.md](VIBRACOM.md). Fonte: https://github.com/listralize/vibracom-agentes
+
 <p align="center">
   <a href="https://agentes.chat"><img src="apps/web/public/favicon.svg" alt="agentes.chat" width="96"></a>
 </p>

@@ -21,6 +21,7 @@ export interface EnvVarDefinition {
     | "Database"
     | "Security"
     | "Sign-in"
+    | "Embedding"
     | "Agents"
     | "Connectors"
     | "Search"
@@ -1142,6 +1143,37 @@ export const envVars = {
     description:
       "Where workspaces get their computer. `off` (default): people connect their own computers. `external`: from a provisioner you run (ADR 0056 §10): every workspace without a ready computer is a request it reads on the operator API, its people see the computer being prepared, and it hands the computer a single-use code to connect with. People may still connect computers of their own under Settings › Devices: agents use them when they name them, but always live on the workspace's computer. Needs `OPERATOR_API_TOKEN`; can't be set with `HOST_COMPUTER_TOKEN`.",
     section: "Operator",
+  },
+  FRAME_ANCESTORS: {
+    schema: z
+      .string()
+      .regex(/^https:\/\/[a-z0-9.-]+(?::\d+)?(?: https:\/\/[a-z0-9.-]+(?::\d+)?)*$/, {
+        error: "must be https origins separated by single spaces, such as https://sistema.example.com",
+      })
+      .optional(),
+    description:
+      "Fork vibracom: origins (https, separated by spaces) whose pages may show this app inside a frame, such as an internal system that embeds it. Sets the Content-Security-Policy frame-ancestors to 'self' plus these origins and drops X-Frame-Options: DENY. Unset (default): the app can't be framed by anyone, as upstream.",
+    section: "Embedding",
+    example: "https://sistema.example.com",
+  },
+  SESSION_COOKIE_SAMESITE: {
+    schema: z.enum(["lax", "none"]).default("lax"),
+    description:
+      "Fork vibracom: SameSite of the session cookies. `lax` (default, as upstream) works in a frame only when the embedding page is on the same site (same registrable domain). `none` (Secure and Partitioned) lets a frame on another site keep a session of its own; needs PUBLIC_URL on https. Prefer a same-site domain and `lax`.",
+    section: "Embedding",
+  },
+  VIBRACOM_SSO_SECRET: {
+    schema: z.string().min(32).optional(),
+    description:
+      "Fork vibracom: shared secret (32+ characters) of the sign-in handed over by vibracom-sistema: `GET /api/auth/vibracom-sso?t=<JWT HS256>` with iss=vibracom-sistema, aud=this PUBLIC_URL's origin, email, name, role (member or admin), exp at most 120 s ahead and a jti used once. Creates the person when needed, adds them to the workspace VIBRACOM_SSO_ORG_ID and signs them in. Unset (default): the route doesn't exist.",
+    section: "Embedding",
+    secret: true,
+  },
+  VIBRACOM_SSO_ORG_ID: {
+    schema: z.string().min(1).max(100).optional(),
+    description:
+      "Fork vibracom: id of the workspace the handed-over sign-in adds people to. Unset: the installation's only workspace, when there is exactly one.",
+    section: "Embedding",
   },
   TELEMETRY: {
     schema: z

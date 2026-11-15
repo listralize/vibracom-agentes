@@ -1,0 +1,61 @@
+# Fork vibracom (listralize/vibracom-agentes): agentes.chat for the vibracom team, deployed by Coolify.
+# Based on agentes.chat by Codari Global, LLC (AGPL-3.0-only). Source: https://github.com/listralize/vibracom-agentes
+# The app image is built from this repository (the fork's code), not pulled from ghcr.io.
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.7-pg18@sha256:2358fcba361ed2233a5ed81b5fe4ca779ccb304120ce531a3bf51c0ed7e2bc11
+    environment:
+      POSTGRES_USER: agentes
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: agentes
+    volumes:
+      - vibracom-agentes-pgdata:/var/lib/postgresql
+    restart: unless-stopped
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U agentes -d agentes"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  agentes:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgres://agentes:${POSTGRES_PASSWORD}@postgres:5432/agentes
+      FILES_DIR: /data/files
+      PUBLIC_URL: ${PUBLIC_URL:?}
+      AGENTES_SECRET: ${AGENTES_SECRET:?}
+      SOURCE_URL: ${SOURCE_URL:-https://github.com/listralize/vibracom-agentes}
+      TELEMETRY: "off"
+      FEEDBACK_RELAY: "false"
+      ALLOW_SIGNUP: "false"
+      OWNER_CLAIM_SHA256: ${OWNER_CLAIM_SHA256:-}
+      FRAME_ANCESTORS: ${FRAME_ANCESTORS:-}
+      SESSION_COOKIE_SAMESITE: ${SESSION_COOKIE_SAMESITE:-lax}
+      VIBRACOM_SSO_SECRET: ${VIBRACOM_SSO_SECRET:-}
+      VIBRACOM_SSO_ORG_ID: ${VIBRACOM_SSO_ORG_ID:-}
+      MCP_CALLER_IDENTITY: ${MCP_CALLER_IDENTITY:-}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - vibracom-agentes-files:/data/files
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 3g
+    stop_grace_period: 40s
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    expose:
+      - "3000"
+volumes:
+  vibracom-agentes-pgdata:
+  vibracom-agentes-files:
