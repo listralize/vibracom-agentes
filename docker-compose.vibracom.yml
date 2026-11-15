@@ -56,6 +56,40 @@ services:
       - /tmp
     expose:
       - "3000"
+  # Daily backup on the server's disk (no new spending): a pg_dump of the database and a tar of the uploaded files,
+  # 14 days kept, in the vibracom-agentes-backups volume. The first one runs at start. Restore: README VIBRACOM.md.
+  backup:
+    image: pgvector/pgvector:0.8.7-pg18@sha256:2358fcba361ed2233a5ed81b5fe4ca779ccb304120ce531a3bf51c0ed7e2bc11
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -u
+        while true; do
+          stamp=$$(date -u +%Y%m%d-%H%M)
+          if pg_dump -h postgres -U agentes -d agentes -Fc -f /backups/agentes-$$stamp.dump.tmp; then
+            mv /backups/agentes-$$stamp.dump.tmp /backups/agentes-$$stamp.dump
+            echo "backup ok: agentes-$$stamp.dump"
+          else
+            rm -f /backups/agentes-$$stamp.dump.tmp
+            echo "backup FAILED: pg_dump"
+          fi
+          tar -czf /backups/files-$$stamp.tar.gz -C /files . && echo "backup ok: files-$$stamp.tar.gz"
+          find /backups -type f -mtime +$$BACKUP_KEEP_DAYS -delete
+          sleep 86400
+        done
+    volumes:
+      - vibracom-agentes-backups:/backups
+      - vibracom-agentes-files:/files:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 256m
 volumes:
   vibracom-agentes-pgdata:
   vibracom-agentes-files:
+  vibracom-agentes-backups:

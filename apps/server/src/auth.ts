@@ -346,6 +346,7 @@ export function createAuth(deps: {
         "/owner-claim": { window: 60, max: 10 },
         "/owner-key": { window: 60, max: 10 },
         "/vibracom-sso": { window: 60, max: 30 },
+        "/vibracom-status": { window: 60, max: 120 },
       },
     },
     advanced: {

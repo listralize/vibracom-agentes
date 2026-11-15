@@ -18,3 +18,19 @@ Arquivos: `apps/server/src/vibracom-sso.ts`, `apps/server/src/app.ts` (`appCsp`)
 ## Publicação (Coolify)
 
 `docker-compose.vibracom.yml`: Postgres 18 + pgvector com volume persistente e o app construído a partir deste repositório. Telemetria desligada (`TELEMETRY=off`), feedback não é enviado ao upstream (`FEEDBACK_RELAY=false`), cadastro fechado (`ALLOW_SIGNUP=false`). Variáveis obrigatórias no Coolify: `POSTGRES_PASSWORD`, `PUBLIC_URL`, `AGENTES_SECRET`.
+
+## Backup
+
+The `backup` service in `docker-compose.vibracom.yml` runs once at start and then every 24 h:
+`pg_dump -Fc` of the database and a tar of the uploaded files, kept 14 days in the `vibracom-agentes-backups`
+volume on the server. Restore a dump (with the app stopped):
+
+```sh
+docker exec -i <postgres-container> pg_restore -U agentes -d agentes --clean --if-exists < agentes-AAAAMMDD-HHMM.dump
+```
+
+## Shortcuts from vibracom-sistema
+
+- `GET /api/auth/vibracom-status` (Bearer: HS256 token with `purpose: "status"`, signed with `VIBRACOM_SSO_SECRET`):
+  whether a model key is set, and the workspace's agents. No key, no person data.
+- `/org/<org>/dm/agent/<agent>?texto=…` opens the DM with that question in the composer, for the person to send.
