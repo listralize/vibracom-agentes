@@ -1725,6 +1725,12 @@
     "use": "Gunakan ikon ini",
     "inUse": "Sedang dipakai",
     "sky": "Latar",
+    "pose": "Posisi",
+    "poses": {
+      "front": "Menghadap depan",
+      "peek": "Mengintip"
+    },
+    "peekBare": "Saat mengintip, ia tidak memakai aksesori.",
     "expression": "Ekspresi",
     "ready": "Ikon siap pakai",
     "oneOrOther": "Dengan aksesori, ekspresinya tetap yang biasa.",
@@ -16574,6 +16580,7 @@
       "waitingYourAnswer": "menunggu jawabanmu",
       "queued": "dalam antrean",
       "handedOn": "menunggu agen lain",
+      "answered": "sudah menjawab",
       "noAnswer": "tidak menjawab",
       "notFinished": "tidak selesai",
       "someAnswered": "{{done}} dari {{total}} menjawab",

@@ -1775,6 +1775,12 @@
     "use": "Dit icoon gebruiken",
     "inUse": "In gebruik",
     "sky": "Achtergrond",
+    "pose": "Houding",
+    "poses": {
+      "front": "Recht vooruit",
+      "peek": "Glurend"
+    },
+    "peekBare": "Glurend draagt hij geen accessoire.",
     "expression": "Gezichtsuitdrukking",
     "ready": "Kant-en-klare iconen",
     "oneOrOther": "Met een accessoire blijft de uitdrukking de gewone.",
@@ -17158,6 +17164,7 @@
       "waitingYourAnswer": "wacht op je antwoord",
       "queued": "in de rij",
       "handedOn": "wacht op andere agents",
+      "answered": "heeft geantwoord",
       "noAnswer": "gaf geen antwoord",
       "notFinished": "niet afgemaakt",
       "someAnswered": "{{done}} van {{total}} gaven antwoord",

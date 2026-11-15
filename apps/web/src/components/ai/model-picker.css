@@ -60,7 +60,6 @@
 .ac-popover.mp {
   width: min(420px, calc(100vw - 32px));
   max-width: min(420px, calc(100vw - 32px));
-  max-height: min(640px, calc(100vh - 96px));
   padding: 0;
   overflow: hidden auto;
   border-radius: var(--radius-lg, 16px);
