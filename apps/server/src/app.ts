@@ -137,6 +137,15 @@ export interface AppOptions {
 const APP_CSP =
   "frame-ancestors 'none'; base-uri 'self'; frame-src 'self' blob: data: https://challenges.cloudflare.com";
 
+/**
+ * Fork vibracom: the policy when FRAME_ANCESTORS names the pages that may embed the app (an internal system showing it
+ * in a frame). Only those origins and this one may frame it; nothing else changes.
+ */
+export function appCsp(frameAncestors: string | undefined): string {
+  if (!frameAncestors) return APP_CSP;
+  return APP_CSP.replace("frame-ancestors 'none'", `frame-ancestors 'self' ${frameAncestors}`);
+}
+
 export function createApp(options: AppOptions) {
   const log = options.log ?? createLogger("warn");
   const version = options.services?.config.APP_VERSION ?? options.version;
@@ -326,11 +335,13 @@ export function createApp(options: AppOptions) {
   // other way out (ADR 0019), and no policy inside the page can stop that. Frames are our own blobs (pages, PDFs)
   // and the bot check.
   const httpsPublicUrl = options.services?.config.PUBLIC_URL?.startsWith("https:") ?? false;
+  const frameAncestors = options.services?.config.FRAME_ANCESTORS;
+  const csp = appCsp(frameAncestors);
   app.use("*", async (c, next) => {
     await next();
     const h = c.res.headers;
-    if (!h.has("x-frame-options")) h.set("x-frame-options", "DENY");
-    if (!h.has("content-security-policy")) h.set("content-security-policy", APP_CSP);
+    if (!frameAncestors && !h.has("x-frame-options")) h.set("x-frame-options", "DENY");
+    if (!h.has("content-security-policy")) h.set("content-security-policy", csp);
     if (httpsPublicUrl && !h.has("strict-transport-security")) h.set("strict-transport-security", "max-age=63072000");
   });
   // A CDN in front may cache by the path's extension, whatever the type: without this, a private

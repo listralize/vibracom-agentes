@@ -71,6 +71,7 @@ import { humanPassesFor } from "./http/human-pass";
 import type { Logger } from "./logger";
 import { ownerSignIn } from "./owner-claim";
 import { phoneBrowserSignIn, phoneFlowStarted } from "./phone-browser-sign-in";
+import { vibracomSso } from "./vibracom-sso";
 
 /**
  * Sign-in for people, built on Better Auth (ADR 0006):
@@ -184,6 +185,8 @@ export function createAuth(deps: {
       phoneBrowserSignIn(),
       desktopSignIn(),
       ownerSignIn({ db, config, log, mint: (adapter, userId) => mintSignIn(adapter, `${FOR_USER}${userId}`) }),
+      // Fork vibracom: the sign-in vibracom-sistema hands over (VIBRACOM_SSO_SECRET), off when unset.
+      vibracomSso({ db, config, log }),
     ],
     database: drizzleAdapter(db, {
       provider: "pg",
@@ -342,10 +345,15 @@ export function createAuth(deps: {
         "/phone/redeem": { window: 60, max: 10 },
         "/owner-claim": { window: 60, max: 10 },
         "/owner-key": { window: 60, max: 10 },
+        "/vibracom-sso": { window: 60, max: 30 },
       },
     },
     advanced: {
       ipAddress: { trustedProxies: config.TRUSTED_PROXIES },
+      // Fork vibracom: a frame on another site keeps its own session only with SameSite=None (Secure, Partitioned).
+      ...(config.SESSION_COOKIE_SAMESITE === "none"
+        ? { defaultCookieAttributes: { sameSite: "none" as const, secure: true, partitioned: true } }
+        : {}),
     },
     // Better Auth answers what its endpoints throw with a 500 of its own, so the app's onError never sees it: this
     // is that error's log line, and its report (ADR 0104). Its refusals (below 500) stay quiet, as before.

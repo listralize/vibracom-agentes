@@ -1,4 +1,5 @@
 import { type ComposioClient, composioFile, FileTooLargeError } from "@agenteschat/adapters";
+import { eq, schema } from "@agenteschat/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { FetchLike, Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
@@ -347,6 +348,12 @@ export function createConnectorToolSource(
     if (!secret) return undefined;
     // Who the audit log's `tool.call` row says is behind the run; a call with no run has nobody.
     const user = ctx.runId ? (await runAuthorityById(ctx.db, ctx.orgId, ctx.runId)).personId : null;
+    // Fork vibracom: the person's email too, so a server with accounts of its own (vibracom-sistema) can answer as
+    // that person, under its own permissions, without a table of agentes.chat ids.
+    const email = user
+      ? ((await ctx.db.select({ email: schema.users.email }).from(schema.users).where(eq(schema.users.id, user)))[0]
+          ?.email ?? null)
+      : null;
     const iat = Math.floor((deps.now?.() ?? new Date()).getTime() / 1000);
     const claims = {
       iss: new URL(deps.publicUrl).origin,
@@ -356,6 +363,7 @@ export function createConnectorToolSource(
       ...(ctx.runId ? { run: ctx.runId } : {}),
       conn: connection.id,
       ...(user ? { user } : {}),
+      ...(email ? { email } : {}),
       iat,
       exp: iat + CALLER_STATEMENT_SECONDS,
       jti: crypto.randomUUID(),
