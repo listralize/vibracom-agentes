@@ -71,7 +71,7 @@ import { humanPassesFor } from "./http/human-pass";
 import type { Logger } from "./logger";
 import { ownerSignIn } from "./owner-claim";
 import { phoneBrowserSignIn, phoneFlowStarted } from "./phone-browser-sign-in";
-import { vibracomSso } from "./vibracom-sso";
+import { vibracomPasswordRefusal, vibracomSso } from "./vibracom-sso";
 
 /**
  * Sign-in for people, built on Better Auth (ADR 0006):
@@ -208,6 +208,10 @@ export function createAuth(deps: {
       // No signed cookie cache: every request reads its session from the database (once, `sessionOf`), so a session
       // that ends (signing out, a new password, "This wasn't me", a block) stops working at once everywhere.
       cookieCache: { enabled: false },
+      // Fork vibracom: a sign-in that lasts VIBRACOM_SESSION_HOURS and is not renewed while used.
+      ...(config.VIBRACOM_SESSION_HOURS
+        ? { expiresIn: config.VIBRACOM_SESSION_HOURS * 3600, updateAge: config.VIBRACOM_SESSION_HOURS * 3600 }
+        : {}),
     },
     emailAndPassword: {
       enabled: true,
@@ -400,6 +404,9 @@ export function createAuth(deps: {
             throw ctx.redirect(`${CONFIRMATION_LANDING}&error=INVALID_TOKEN`);
           }
         }
+        // Fork vibracom: with VIBRACOM_LOCKDOWN the staff comes in only through vibracom-sistema.
+        const closed = vibracomPasswordRefusal(config, ctx.path, (ctx.body as { email?: unknown } | undefined)?.email);
+        if (closed) throw new APIError("FORBIDDEN", { code: "VIBRACOM_LOCKDOWN", message: closed });
         const action = HUMAN_ACTIONS[ctx.path];
         // Before the sign-up policy: a bot gets the cheap refusal first.
         if (action && ctx.headers) {

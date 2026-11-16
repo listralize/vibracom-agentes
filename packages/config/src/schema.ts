@@ -1175,6 +1175,36 @@ export const envVars = {
       "Fork vibracom: id of the workspace the handed-over sign-in adds people to. Unset: the installation's only workspace, when there is exactly one.",
     section: "Embedding",
   },
+  VIBRACOM_LOCKDOWN: {
+    schema: z
+      .stringbool()
+      .transform((on) => (on ? "on" : "off") as "on" | "off")
+      .default("off"),
+    description:
+      "Fork vibracom: `on` closes this installation to the company's lay staff, who use the agents only through vibracom-sistema's own page (its service API `/api/vibracom/v1`). The handed-over sign-in then only lets in tokens with `area: \"tecnica\"` (vibracom-sistema gives them to its IT admins), signing in with a password is only for VIBRACOM_DIRECT_LOGIN, and nobody else can add a password to their account. `off` (default): as upstream.",
+    section: "Embedding",
+  },
+  VIBRACOM_DIRECT_LOGIN: {
+    schema: z
+      .string()
+      .max(2000)
+      .optional()
+      .transform((v) =>
+        (v ?? "")
+          .split(",")
+          .map((e) => e.trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    description:
+      "Fork vibracom: comma-separated e-mails that may still sign in with a password (or add one) when VIBRACOM_LOCKDOWN is on, such as the IT owner's account. Unset: nobody.",
+    section: "Embedding",
+  },
+  VIBRACOM_SESSION_HOURS: {
+    schema: z.coerce.number().int().min(1).max(720).optional(),
+    description:
+      "Fork vibracom: how long a sign-in lasts, in hours, before the person has to come in again (it is not renewed while used). Unset: the upstream default.",
+    section: "Embedding",
+  },
   TELEMETRY: {
     schema: z
       .stringbool()
