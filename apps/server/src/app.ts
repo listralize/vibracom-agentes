@@ -84,6 +84,7 @@ import { type AppsRouteOptions, registerAppsRoot, registerOauthRoutes } from "./
 import { pushRelayRoutes } from "./routes/push-relay";
 import { registerWaitlist } from "./routes/waitlist";
 import { registerRoutineHooks, registerWebhookReceiver, webhookAdminRoutes } from "./routes/webhooks";
+import { vibracomApiRoutes } from "./vibracom-api";
 
 export interface AppOptions {
   edition: Edition;
@@ -266,6 +267,8 @@ export function createApp(options: AppOptions) {
       }),
     );
     if (deps.config.LANDING_URL) registerWaitlist(api, deps);
+    // Fork vibracom: the service API of vibracom-sistema's own agents page (VIBRACOM_SSO_SECRET), off when unset.
+    if (deps.config.VIBRACOM_SSO_SECRET) api.route("/vibracom/v1", vibracomApiRoutes(deps));
     // The push relay for other installations' phone pushes (ADR 0152, ADR 0178), with this server's Firebase
     // account and APNs key.
     if (deps.config.PUSH_RELAY_SERVE === "on") {

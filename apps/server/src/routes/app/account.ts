@@ -100,6 +100,7 @@ import { humanCheckRefusal } from "../../http/human-check";
 import { humanPassesFor } from "../../http/human-pass";
 import { imageFile } from "../../http/image-file";
 import { releaseOf } from "../../version";
+import { vibracomMaySetPassword } from "../../vibracom-sso";
 import {
   type AppDeps,
   body,
@@ -850,6 +851,10 @@ export function accountRoutes(deps: AppDeps) {
     async (c) => {
       const startedAt = Date.now();
       const userId = c.get("user").id;
+      // Fork vibracom: with VIBRACOM_LOCKDOWN the staff signs in only through vibracom-sistema.
+      if (!vibracomMaySetPassword(deps.config, c.get("user").email)) {
+        return apiError(c, 403, "vibracom.lockdown", "Senhas ficam com a TI: entre pelo sistema vibracom.");
+      }
       if (!(await signedInLately(deps.auth, c.req.raw.headers, userId))) {
         return apiError(c, 403, "reauth.sign_in", "Sign in again to set a password");
       }

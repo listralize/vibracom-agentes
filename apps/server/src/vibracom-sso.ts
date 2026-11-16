@@ -34,6 +34,8 @@ const Claims = z.object({
   iat: z.number().int(),
   exp: z.number().int(),
   jti: z.string().regex(/^[A-Za-z0-9_-]{16,100}$/),
+  /** `tecnica`: an IT admin of vibracom-sistema, the only ones let in here when VIBRACOM_LOCKDOWN is on. */
+  area: z.enum(["tecnica"]).optional(),
 });
 export type VibracomSsoClaims = z.infer<typeof Claims>;
 
@@ -105,8 +107,33 @@ export function verifyVibracomStatusToken(
   }
 }
 
+const PASSWORD_PATHS = new Set(["/sign-in/email", "/request-password-reset", "/sign-up/email"]);
+
+/**
+ * Why a password step is refused when VIBRACOM_LOCKDOWN is on (null: it goes on). Signing in, asking for a reset
+ * or signing up with an address is only for VIBRACOM_DIRECT_LOGIN: everyone else comes in through vibracom-sistema.
+ */
+export function vibracomPasswordRefusal(
+  config: Pick<Config, "VIBRACOM_LOCKDOWN" | "VIBRACOM_DIRECT_LOGIN">,
+  path: string,
+  email: unknown,
+): string | null {
+  if (config.VIBRACOM_LOCKDOWN !== "on" || !PASSWORD_PATHS.has(path)) return null;
+  const address = typeof email === "string" ? email.trim().toLowerCase() : "";
+  if (address && config.VIBRACOM_DIRECT_LOGIN.includes(address)) return null;
+  return "Os Agentes são usados pelo sistema vibracom: entre por lá, na página Agentes.";
+}
+
+/** Whether this account may add or change a password when VIBRACOM_LOCKDOWN is on. */
+export function vibracomMaySetPassword(
+  config: Pick<Config, "VIBRACOM_LOCKDOWN" | "VIBRACOM_DIRECT_LOGIN">,
+  email: string,
+): boolean {
+  return config.VIBRACOM_LOCKDOWN !== "on" || config.VIBRACOM_DIRECT_LOGIN.includes(email.trim().toLowerCase());
+}
+
 /** The workspace people join: the configured one, or the only one there is. */
-async function vibracomOrgId(db: Database, config: Config): Promise<string | null> {
+export async function vibracomOrgId(db: Database, config: Config): Promise<string | null> {
   if (config.VIBRACOM_SSO_ORG_ID) return config.VIBRACOM_SSO_ORG_ID;
   const rows = await db
     .select({ id: schema.organizations.id })
@@ -132,6 +159,10 @@ export function vibracomSso(deps: { db: Database; config: Config; log: Logger })
           if (!claims)
             throw new APIError("UNAUTHORIZED", {
               message: "Link de acesso inválido ou expirado. Abra de novo pelo sistema.",
+            });
+          if (config.VIBRACOM_LOCKDOWN === "on" && claims.area !== "tecnica")
+            throw new APIError("FORBIDDEN", {
+              message: "A área técnica dos Agentes é só da TI. Use os Agentes pela página Agentes do sistema.",
             });
           // Each token signs in once: its jti is kept for as long as the token could still be shown.
           const identifier = `vibracom-sso:${claims.jti}`;
@@ -207,6 +238,7 @@ export function vibracomSso(deps: { db: Database; config: Config; log: Logger })
             name: schema.agents.name,
             handle: schema.agents.handle,
             role: schema.agents.role,
+            builtin: schema.agents.builtin,
           })
           .from(schema.agents)
           .where(and(eq(schema.agents.orgId, orgId), isNull(schema.agents.archivedAt)))
